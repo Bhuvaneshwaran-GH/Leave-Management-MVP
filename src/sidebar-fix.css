@@ -1,0 +1,20 @@
+.sidebar > div:first-child {
+  min-width: 0;
+}
+
+.sidebar .brand {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-size: 16px;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.sidebar .brand::before,
+.sidebar .brand::after {
+  content: none;
+}
