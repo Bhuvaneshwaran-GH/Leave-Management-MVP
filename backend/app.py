@@ -66,6 +66,23 @@ def ensure_notification_storage():
         )
         connection.execute(
             """
+            DELETE FROM notifications older
+            USING notifications newer
+            WHERE older.id <> newer.id
+              AND older.recipient_id = newer.recipient_id
+              AND older.request_id IS NOT DISTINCT FROM newer.request_id
+              AND older.type = newer.type
+              AND older.created_at > newer.created_at
+            """
+        )
+        connection.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS notifications_event_unique_idx
+            ON notifications(recipient_id, request_id, type)
+            """
+        )
+        connection.execute(
+            """
             INSERT INTO notifications (recipient_id, request_id, type, message, created_at)
             SELECT lr.employee_id, lr.id, 'submitted',
                    'Your leave request was submitted for review.', lr.submitted_at
@@ -294,7 +311,11 @@ class PasswordChange(BaseModel):
 
 def create_notification(connection, recipient_id, request_id, notification_type, message):
     connection.execute(
-        "INSERT INTO notifications (recipient_id, request_id, type, message) VALUES (%s, %s, %s, %s)",
+        """
+        INSERT INTO notifications (recipient_id, request_id, type, message)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (recipient_id, request_id, type) DO NOTHING
+        """,
         (recipient_id, request_id, notification_type, message),
     )
 
@@ -508,5 +529,4 @@ def change_password(body: PasswordChange, user=Depends(current_user)):
         connection.execute("UPDATE users SET password_hash = %s WHERE id = %s", (password_hash, user["id"]))
         connection.commit()
     return {"message": "Password updated"}
-
 

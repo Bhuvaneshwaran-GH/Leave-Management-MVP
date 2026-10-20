@@ -1,0 +1,5 @@
+backend/
+database/
+.venv/
+node_modules/
+dist/
