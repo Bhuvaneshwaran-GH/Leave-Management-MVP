@@ -1,6 +1,59 @@
-﻿# SEKURZEN Leave Management MVP
+# SEKURZEN Leave Management Portal
 
-A small leave-management workspace for employees and managers. The MVP includes login, leave balances, request submission, overlap and balance validation, pending cancellation, and manager approval or rejection.
+A production-deployed full-stack leave management portal for employees and managers. The application includes JWT authentication, leave balances, request submission and cancellation, overlap and balance validation, manager approval or rejection, shared manager visibility, persistent notifications, and organization-wide public-holiday management.
+
+## Production architecture
+
+- **Frontend:** React/Vite deployed on Vercel.
+- **Backend:** FastAPI deployed on Render.
+- **Database:** PostgreSQL hosted on Render.
+- **Authentication:** JWT bearer tokens with bcrypt password hashes.
+
+Production services:
+
+- Frontend: `https://leave-management-portal-966z-kzpft1836.vercel.app`
+- API health check: `https://leave-management-mvp-966z.onrender.com/health`
+
+Never commit `backend/.env` or paste production credentials into source files, documentation, or GitHub.
+
+## Technology stack
+
+- React 18 and Vite for the browser application.
+- FastAPI and Python for the REST API.
+- PostgreSQL for persistent application data, accessed with psycopg.
+- bcrypt for password hashing and JWT bearer tokens for authenticated API requests.
+- Vercel for the frontend and Render for the API and PostgreSQL database.
+
+## Architecture overview
+
+The browser application sends HTTPS requests to the FastAPI service. FastAPI validates credentials, issues JWTs, enforces employee/manager permissions, and reads or writes PostgreSQL data. The React application does not connect directly to PostgreSQL. The frontend and API are deployed separately, with CORS configured to allow the Vercel application origin.
+
+## Data model overview
+
+- `organizations` groups accounts and organization-wide settings.
+- `users` stores employee and manager profiles, roles, active status, and password hashes.
+- `leave_balances` tracks earned and sick leave entitlement and usage per user.
+- `leave_requests` stores requested dates, calculated working days, status, and decision details.
+- `organization_managers` links managers to organizations.
+- `organization_holidays` stores manager-declared organization holidays.
+- `notifications` stores leave request and decision notifications for users.
+- `password_reset_requests` stores reset requests where that workflow is enabled.
+
+## Assumptions
+
+- Each user belongs to one organization; the current deployment is configured for SEKURZEN.
+- Leave entitlement starts at 12 earned days and 10 sick days per year.
+- Monday through Friday are working days. Saturdays, Sundays, and manager-declared organization holidays are excluded from leave-day calculations and cannot be selected as the first or last leave date.
+- Only approved leave reduces the balance. Pending and approved requests cannot overlap for the same employee.
+- Managers in the organization share visibility of requests and decision history.
+
+## Known limitations
+
+- The current product setup is a single-organization MVP; there is no organization onboarding or tenant administration UI.
+- User passwords are provisioned by an administrator. Password recovery by email is not configured.
+- Notifications are stored and shown in the application; external email or push delivery is not configured.
+- Leave policies are fixed in the application and do not yet support per-user accrual schedules or configurable entitlement rules.
+- Demo accounts must be provisioned with the script below. Passwords are chosen at provisioning time and are not published in this repository.
 
 ## Run locally
 
@@ -15,7 +68,14 @@ For local development, run the FastAPI backend at `http://127.0.0.1:8000`; the V
 
 ## User accounts
 
-The login form does not contain prefilled credentials. Users must be created through the application’s account-management flow or an approved provisioning process. Passwords must never be committed to source code, seed files, or documentation.
+The login form does not contain prefilled credentials. To create/reset the demo manager account or employee account, configure `backend/.env` with the target database URL and run one of these from the repository root:
+
+```powershell
+python backend\seed_demo_accounts.py --manager-only
+python backend\seed_demo_accounts.py --employee-only
+```
+
+The script prompts for a password of at least eight characters. Share the resulting demo email and chosen password privately with the evaluator alongside the repository link. Do not put passwords in this public README, source code, seed files, or GitHub.
 
 ## PostgreSQL setup with psql
 
@@ -74,6 +134,52 @@ Keep this terminal running while using the Vite frontend. Start the frontend in 
 Check it at `http://localhost:8000/health`. Interactive API documentation is available at `http://localhost:8000/docs`.
 
 Available API areas include `/auth/login`, `/me`, `/leave/balances`, `/leave/requests`, `/leave/requests/{request_id}/cancel`, `/manager/requests`, `/manager/dashboard`, `/notifications`, `/auth/password`.
+
+## Production deployment
+
+### Render backend
+
+Create a Render Web Service from this repository with:
+
+```text
+Build Command: pip install -r backend/requirements.txt
+Start Command: uvicorn backend.app:app --host 0.0.0.0 --port $PORT
+```
+
+Configure these environment variables in the Render Web Service. Keep their values private:
+
+```text
+DATABASE_URL=<Render PostgreSQL Internal Database URL>
+JWT_SECRET=<long random secret>
+CORS_ORIGINS=https://leave-management-portal-966z-kzpft1836.vercel.app
+```
+
+Apply the database schema once using the PostgreSQL connection details from Render:
+
+```powershell
+psql "<external-database-url>" -f database\schema.sql
+psql "<external-database-url>" -f database\seed.sql
+```
+
+The database URL used by the deployed backend should be the Render PostgreSQL **Internal Database URL**. Cron jobs are not required.
+
+### Vercel frontend
+
+Create a Vercel project from this repository with:
+
+```text
+Framework Preset: Vite
+Build Command: npm run build
+Output Directory: dist
+```
+
+Configure this Vercel environment variable before deploying:
+
+```text
+VITE_API_URL=https://leave-management-mvp-966z.onrender.com
+```
+
+After deployment, verify the API health URL and then test login from the Vercel frontend.
 
 ## Product decisions
 
