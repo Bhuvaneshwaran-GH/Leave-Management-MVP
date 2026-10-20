@@ -28,6 +28,75 @@ Never commit `backend/.env` or paste production credentials into source files, d
 
 The browser application sends HTTPS requests to the FastAPI service. FastAPI validates credentials, issues JWTs, enforces employee/manager permissions, and reads or writes PostgreSQL data. The React application does not connect directly to PostgreSQL. The frontend and API are deployed separately, with CORS configured to allow the Vercel application origin.
 
+## Features
+
+### Employee features
+
+- Secure login with JWT authentication.
+- Dashboard with earned-leave and sick-leave balances.
+- Leave application with leave type, date range, and reason.
+- Automatic working-day calculation that excludes weekends and organization holidays.
+- Validation for invalid dates, overlapping requests, and insufficient balance.
+- Request history with pending, approved, rejected, and cancelled statuses.
+- Cancellation of pending requests.
+- Request details showing submission and decision history.
+- Persistent in-app notifications for submissions, approvals, rejections, and cancellations.
+- Read notifications remain marked as seen after page refresh or a new login.
+- Password change support for authenticated users.
+
+### Manager features
+
+- Manager dashboard with organization request statistics.
+- Shared organization-wide request queue visible to all managers in the organization.
+- Request review with employee, leave dates, working days, reason, and status.
+- Approve or reject requests with decision history.
+- Decision-maker and decision-date visibility for employees and managers.
+- Persistent notifications for new submissions and cancelled requests.
+- Organization-wide public-holiday administration.
+- Holiday-aware leave validation and date selection.
+
+### Platform and reliability features
+
+- Server-side authorization for employee and manager operations.
+- PostgreSQL persistence for users, balances, requests, holidays, notifications, and audit details.
+- Database-backed notification deduplication so the same event is not repeatedly created.
+- Health endpoint for deployment monitoring.
+- Separate Vercel and Render deployment configuration.
+
+## Application workflow
+
+### Employee leave workflow
+
+1. The employee opens the Vercel application and signs in.
+2. The frontend sends the credentials to the FastAPI `/auth/login` endpoint.
+3. The backend validates the bcrypt password hash and returns a JWT.
+4. The employee views current leave balances and existing requests.
+5. The employee selects a leave type and date range. The application identifies weekends and organization holidays that are excluded from the calculation.
+6. The backend validates the dates, working-day count, balance, and overlap rules.
+7. A valid request is stored as `pending`, and a submission notification is created.
+8. The employee can monitor the request history or cancel the request while it is pending.
+9. The employee receives a persistent notification when a manager approves or rejects the request.
+10. Approved requests reduce the relevant leave balance; rejected and cancelled requests do not.
+
+### Manager review workflow
+
+1. A manager signs in and opens the manager dashboard.
+2. The backend limits manager actions to authorized manager accounts.
+3. All managers assigned to the organization see the shared request queue.
+4. A manager opens a request and reviews the employee, dates, working days, leave type, reason, and current status.
+5. The manager approves or rejects the request.
+6. The backend stores the decision, deciding manager, and decision timestamp.
+7. The employee's balance is updated only for an approval.
+8. The employee and relevant managers receive the corresponding persistent notification.
+
+### Public-holiday workflow
+
+1. An authorized manager opens public-holiday settings.
+2. The manager adds an organization-wide holiday with a date and name.
+3. The backend stores the holiday for the organization and prevents duplicate dates.
+4. The holiday appears in the employee leave form and is excluded from working-day calculations.
+5. Weekends remain weekly rest days and are not shifted when they overlap a holiday.
+
 ## Data model overview
 
 - `organizations` groups accounts and organization-wide settings.
